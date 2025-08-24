@@ -205,9 +205,12 @@ def carregar_tabela_codigo(engine, pasta_saida, extensao_arquivo, nome_tabela):
             total_inserido = result.fetchone()[0]
         
         logger.info(f"Total de registros na tabela {nome_tabela}: {total_inserido}")
+        logger.info(f"Registros esperados do arquivo: {len(dtab)}")
         
         if total_inserido != len(dtab):
             logger.warning(f"⚠ Diferença no número de registros: esperado {len(dtab)}, inserido {total_inserido}")
+        else:
+            logger.info(f"✓ Contagem de registros confere: {total_inserido}/{len(dtab)}")
         
         return True
         
@@ -250,14 +253,26 @@ def carregar_tabela_principal(engine, engine_url, pasta_saida, nome_tabela, exte
             logger.info(f"Estrutura do DataFrame: {ddf.shape}")
             logger.info(f"Colunas: {list(ddf.columns)}")
             
-            # Verificar se já existem dados na tabela
+            # Verificar se já existem dados na tabela e se estão completos
             with engine.connect() as conn:
                 result = conn.execute(text(f'SELECT COUNT(*) as total FROM {nome_tabela}'))
                 total_existente = result.fetchone()[0]
                 
                 if total_existente > 0:
-                    logger.info(f"Tabela {nome_tabela} já possui {total_existente} registros, pulando inserção...")
-                    continue
+                    # VERIFICAR SE A TABELA ESTÁ COMPLETA
+                    logger.info(f"Verificando se tabela {nome_tabela} está completa...")
+                    
+                    # Contar registros esperados do arquivo CSV
+                    registros_esperados = ddf.shape[0].compute()
+                    logger.info(f"Registros esperados do arquivo: {registros_esperados}")
+                    logger.info(f"Registros existentes no banco: {total_existente}")
+                    
+                    if total_existente >= registros_esperados:
+                        logger.info(f"✓ Tabela {nome_tabela} já está completa ({total_existente}/{registros_esperados}), pulando inserção...")
+                        continue
+                    else:
+                        logger.info(f"⚠ Tabela {nome_tabela} incompleta ({total_existente}/{registros_esperados}), inserindo dados faltantes...")
+                        # Continuar para inserir apenas o que falta
         
         # Inserir dados
         logger.info("Inserindo dados no banco...")
@@ -273,7 +288,7 @@ def carregar_tabela_principal(engine, engine_url, pasta_saida, nome_tabela, exte
         
         logger.info(f"Dados inseridos em {end_time - start_time:.2f}s")
         
-        # Verificar registros inseridos
+        # Verificar registros inseridos e comparar com esperado
         with engine.connect() as conn:
             result = conn.execute(text(f'SELECT COUNT(*) as total FROM {nome_tabela}'))
             total_atual = result.fetchone()[0]
@@ -281,8 +296,18 @@ def carregar_tabela_principal(engine, engine_url, pasta_saida, nome_tabela, exte
         registros_arquivo = total_atual - total_registros
         total_registros = total_atual
         
+        # Contar registros esperados do arquivo para comparação
+        registros_esperados = ddf.shape[0].compute()
+        
         logger.info(f"Registros inseridos deste arquivo: {registros_arquivo}")
         logger.info(f"Total acumulado na tabela {nome_tabela}: {total_registros}")
+        logger.info(f"Registros esperados do arquivo: {registros_esperados}")
+        
+        # Verificar se há diferença (similar às tabelas de códigos)
+        if total_registros != registros_esperados:
+            logger.warning(f"⚠ Diferença no número de registros: esperado {registros_esperados}, inserido {total_registros}")
+        else:
+            logger.info(f"✓ Contagem de registros confere: {total_registros}/{registros_esperados}")
         
         logger.info(f"✓ Tabela {nome_tabela} carregada com sucesso. Total: {total_registros} registros")
         return total_registros
@@ -487,6 +512,21 @@ def main():
         colunas_socios = ['cnpj_basico', 'identificador_de_socio', 'nome_socio', 'cnpj_cpf_socio', 'qualificacao_socio', 'data_entrada_sociedade', 'pais', 'representante_legal', 'nome_representante', 'qualificacao_representante_legal', 'faixa_etaria']
         
         colunas_simples = ['cnpj_basico', 'opcao_simples', 'data_opcao_simples', 'data_exclusao_simples', 'opcao_mei', 'data_opcao_mei', 'data_exclusao_mei']
+        
+        # Verificar estado atual das tabelas antes de começar
+        logger.info("\n" + "="*50)
+        logger.info("VERIFICANDO ESTADO ATUAL DAS TABELAS")
+        logger.info("="*50)
+        
+        with engine.connect() as conn:
+            tabelas_verificar = ['cnae', 'motivo', 'municipio', 'natureza_juridica', 'pais', 'qualificacao_socio', 'estabelecimento', 'socios_original', 'empresas', 'simples']
+            for tabela in tabelas_verificar:
+                try:
+                    result = conn.execute(text(f'SELECT COUNT(*) as total FROM {tabela}'))
+                    total = result.fetchone()[0]
+                    logger.info(f"  {tabela:20}: {total:>10,} registros")
+                except Exception as e:
+                    logger.info(f"  {tabela:20}: {'NÃO EXISTE':>10}")
         
         # Carregar tabelas de códigos
         logger.info("\n" + "="*50)

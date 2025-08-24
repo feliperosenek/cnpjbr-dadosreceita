@@ -71,24 +71,25 @@ def conectar_banco():
 def verificar_contadores(engine):
     """Verifica contadores das tabelas principais"""
     try:
-        with engine.connect() as conn:
-            # Verificar tabelas principais
-            tabelas = ['estabelecimento', 'empresas', 'socios_original', 'simples', 'cnae', 'motivo', 'municipio', 'natureza_juridica', 'pais', 'qualificacao_socio']
-            
-            print("\n" + "="*60)
-            print("CONTADORES EM TEMPO REAL")
-            print("="*60)
-            
-            for tabela in tabelas:
-                try:
+        # Verificar tabelas principais
+        tabelas = ['estabelecimento', 'empresas', 'socios_original', 'simples', 'cnae', 'motivo', 'municipio', 'natureza_juridica', 'pais', 'qualificacao_socio']
+        
+        print("\n" + "="*60)
+        print("CONTADORES EM TEMPO REAL")
+        print("="*60)
+        
+        for tabela in tabelas:
+            try:
+                # Usar conexão separada para cada tabela para evitar problemas de transação
+                with engine.connect() as conn:
                     result = conn.execute(text(f"SELECT COUNT(*) as total FROM {tabela}"))
                     total = result.fetchone()[0]
                     print(f"  {tabela:20}: {total:>10,} registros")
-                except Exception as e:
-                    print(f"  {tabela:20}: {'ERRO':>10} - {str(e)}")
-            
-            print("="*60)
-            
+            except Exception as e:
+                print(f"  {tabela:20}: {'ERRO':>10} - {str(e)}")
+        
+        print("="*60)
+        
     except Exception as e:
         print(f"Erro ao verificar contadores: {str(e)}")
 
