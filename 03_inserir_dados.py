@@ -168,6 +168,36 @@ def carregar_tabela_codigo(engine, pasta_saida, extensao_arquivo, nome_tabela):
         codigos_unicos = dtab['codigo'].nunique()
         logger.info(f"Códigos únicos encontrados: {codigos_unicos}")
         
+        # Verificar se já existem dados e se são os mesmos
+        with engine.connect() as conn:
+            result = conn.execute(text(f'SELECT COUNT(*) as total FROM {nome_tabela}'))
+            total_existente = result.fetchone()[0]
+            
+            if total_existente > 0:
+                logger.info(f"Tabela {nome_tabela} já possui {total_existente} registros, verificando se são os mesmos...")
+                
+                # Verificar se os dados são idênticos (primeiro e último registro)
+                primeiro_codigo = dtab.iloc[0]['codigo']
+                ultimo_codigo = dtab.iloc[-1]['codigo']
+                
+                result = conn.execute(text(f"SELECT codigo FROM {nome_tabela} ORDER BY codigo LIMIT 1"))
+                primeiro_existente = result.fetchone()
+                primeiro_existente = primeiro_existente[0] if primeiro_existente else None
+                
+                result = conn.execute(text(f"SELECT codigo FROM {nome_tabela} ORDER BY codigo DESC LIMIT 1"))
+                ultimo_existente = result.fetchone()
+                ultimo_existente = ultimo_existente[0] if ultimo_existente else None
+                
+                # Verificar se o número de registros é o mesmo
+                if total_existente == len(dtab):
+                    if primeiro_existente == primeiro_codigo and ultimo_existente == ultimo_codigo:
+                        logger.info(f"✓ Tabela {nome_tabela} já contém exatamente os mesmos dados ({total_existente} registros), pulando inserção...")
+                        return True
+                    else:
+                        logger.warning(f"⚠ Número de registros igual mas dados diferentes detectados, inserindo novos registros...")
+                else:
+                    logger.info(f"⚠ Número de registros diferente (existente: {total_existente}, esperado: {len(dtab)}), inserindo novos registros...")
+        
         # Inserir dados
         logger.info(f"Inserindo dados na tabela {nome_tabela}...")
         start_time = time.time()
