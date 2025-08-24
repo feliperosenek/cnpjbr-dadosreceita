@@ -188,11 +188,34 @@ def carregar_tabela_codigo(engine, pasta_saida, extensao_arquivo, nome_tabela):
                 ultimo_existente = result.fetchone()
                 ultimo_existente = ultimo_existente[0] if ultimo_existente else None
                 
-                # Verificar se o número de registros é o mesmo
-                if total_existente == len(dtab):
+                # Verificar se o número de registros é adequado
+                if total_existente >= len(dtab):
                     if primeiro_existente == primeiro_codigo and ultimo_existente == ultimo_codigo:
                         logger.info(f"✓ Tabela {nome_tabela} já contém exatamente os mesmos dados ({total_existente} registros), pulando inserção...")
                         return True
+                    elif total_existente > len(dtab):
+                        logger.warning(f"⚠ Tabela {nome_tabela} possui MAIS registros ({total_existente}) que o esperado ({len(dtab)}). Possível inconsistência detectada!")
+                        logger.info(f"  Primeiro código existente: {primeiro_existente}")
+                        logger.info(f"  Primeiro código esperado: {primeiro_codigo}")
+                        logger.info(f"  Último código existente: {ultimo_existente}")
+                        logger.info(f"  Último código esperado: {ultimo_codigo}")
+                        
+                        # Verificar se a diferença é muito grande (possível erro)
+                        diferenca_percentual = ((total_existente - len(dtab)) / len(dtab)) * 100
+                        
+                        if diferenca_percentual > 50:  # Mais de 50% de diferença
+                            logger.error(f"❌ Diferença muito grande detectada: {diferenca_percentual:.1f}% a mais!")
+                            logger.error(f"  Isso pode indicar dados corrompidos ou múltiplas execuções")
+                            resp = input(f"Tabela {nome_tabela} tem {diferenca_percentual:.1f}% mais registros. Continuar inserindo? (S/N) [N]: ").strip()
+                        else:
+                            logger.warning(f"  Diferença moderada: {diferenca_percentual:.1f}% a mais")
+                            resp = input(f"Tabela {nome_tabela} tem mais registros que o esperado. Continuar inserindo? (S/N) [N]: ").strip()
+                        
+                        if resp.upper() != 'S':
+                            logger.info(f"Pulando inserção na tabela {nome_tabela} por decisão do usuário")
+                            return True
+                        else:
+                            logger.info(f"Continuando inserção conforme solicitado pelo usuário")
                     else:
                         logger.warning(f"⚠ Número de registros igual mas dados diferentes detectados, inserindo novos registros...")
                 else:
