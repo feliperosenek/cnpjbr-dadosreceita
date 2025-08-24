@@ -54,6 +54,7 @@ O projeto inclui um [Makefile](Makefile) para facilitar a execução das etapas 
 Instale as dependências com:
 
 ```sh
-pip install -r equirements.txt
+pip install -r requirements.txt
 ```
+
 
