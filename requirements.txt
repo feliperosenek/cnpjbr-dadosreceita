@@ -18,3 +18,8 @@ psutil>=5.8.0
 # Outras dependências
 glob2>=0.7
 
+# Dependências para web scraping e download
+beautifulsoup4
+lxml
+wget
+parfive
