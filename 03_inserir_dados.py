@@ -469,8 +469,15 @@ def verificar_integridade_dados(engine):
     
     try:
         with engine.connect() as conn:
-            # Contar registros em cada tabela
-            tabelas = ['empresas', 'estabelecimento', 'socios', 'simples', 'cnae', 'motivo', 'municipio', 'natureza_juridica', 'pais', 'qualificacao_socio']
+            # Contar registros em cada tabela (incluindo tabelas finais)
+            tabelas = [
+                # Tabelas principais
+                'empresas', 'estabelecimento', 'simples',
+                # Tabelas de códigos
+                'cnae', 'motivo', 'municipio', 'natureza_juridica', 'pais', 'qualificacao_socio',
+                # Tabelas finais (criadas durante otimização)
+                'socios', '_referencia'
+            ]
             
             for tabela in tabelas:
                 try:
@@ -549,7 +556,16 @@ def main():
         logger.info("="*50)
         
         with engine.connect() as conn:
-            tabelas_verificar = ['cnae', 'motivo', 'municipio', 'natureza_juridica', 'pais', 'qualificacao_socio', 'estabelecimento', 'socios_original', 'empresas', 'simples']
+            # Verificar tabelas originais e finais
+            tabelas_verificar = [
+                # Tabelas de códigos (sempre existem)
+                'cnae', 'motivo', 'municipio', 'natureza_juridica', 'pais', 'qualificacao_socio',
+                # Tabelas principais (podem ter sido substituídas)
+                'estabelecimento', 'socios_original', 'empresas', 'simples',
+                # Tabelas finais (criadas durante otimização)
+                'socios', '_referencia'
+            ]
+            
             for tabela in tabelas_verificar:
                 try:
                     result = conn.execute(text(f'SELECT COUNT(*) as total FROM {tabela}'))
@@ -557,6 +573,34 @@ def main():
                     logger.info(f"  {tabela:20}: {total:>10,} registros")
                 except Exception as e:
                     logger.info(f"  {tabela:20}: {'NÃO EXISTE':>10}")
+            
+            # Verificar se houve transformação de tabelas
+            logger.info("\n" + "-" * 50)
+            logger.info("VERIFICAÇÃO DE TRANSFORMAÇÕES")
+            logger.info("-" * 50)
+            
+            # Verificar se socios_original foi transformada em socios
+            try:
+                result = conn.execute(text("SELECT COUNT(*) as total FROM socios"))
+                total_socios = result.fetchone()[0]
+                if total_socios > 0:
+                    logger.info(f"  ✓ Tabela 'socios' criada com {total_socios:,} registros")
+                    logger.info(f"  ℹ️  Tabela 'socios_original' foi transformada em 'socios'")
+                else:
+                    logger.info(f"  ⚠ Tabela 'socios' existe mas está vazia")
+            except Exception as e:
+                logger.info(f"  ❌ Tabela 'socios' não foi criada")
+            
+            # Verificar tabela de referência
+            try:
+                result = conn.execute(text("SELECT COUNT(*) as total FROM _referencia"))
+                total_ref = result.fetchone()[0]
+                if total_ref > 0:
+                    logger.info(f"  ✓ Tabela '_referencia' criada com {total_ref:,} registros")
+                else:
+                    logger.info(f"  ⚠ Tabela '_referencia' existe mas está vazia")
+            except Exception as e:
+                logger.info(f"  ❌ Tabela '_referencia' não foi criada")
         
         # Carregar tabelas de códigos
         logger.info("\n" + "="*50)
