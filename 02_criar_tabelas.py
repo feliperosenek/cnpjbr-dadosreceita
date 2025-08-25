@@ -150,7 +150,7 @@ def testar_conexao(config):
                 
                 # Conectar como postgres para criar usuário
                 postgres_username = 'postgres'
-                postgres_password = 'postgres1231'
+                postgres_password = 'postgres123'  # Corrigido: usar senha correta
                 
                 logger.info(f"Conectando como usuário administrador: {postgres_username}")
                 

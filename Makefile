@@ -37,7 +37,7 @@ UNZIP_LOG = $(LOG_DIR)/unzip_$(shell date +%Y%m%d_%H%M%S).log
 TABLES_LOG = $(LOG_DIR)/tables_$(shell date +%Y%m%d_%H%M%S).log
 INSERT_LOG = $(LOG_DIR)/insert_$(shell date +%Y%m%d_%H%M%S).log
 
-.PHONY: help download unzip tables insert all clean status check-deps
+.PHONY: help download unzip tables insert insert-stop insert-restart insert-logs insert-status insert-monitor insert-clean all clean status check-deps
 
 # Target padrão
 help:
@@ -49,11 +49,19 @@ help:
 	@echo "  $(YELLOW)make download$(NC)    - Executa download dos dados CNPJ"
 	@echo "  $(YELLOW)make unzip$(NC)       - Descompacta os arquivos baixados"
 	@echo "  $(YELLOW)make tables$(NC)      - Cria as tabelas no banco de dados"
-	@echo "  $(YELLOW)make insert$(NC)      - Insere os dados nas tabelas"
+	@echo "  $(YELLOW)make insert$(NC)      - Insere os dados nas tabelas (com PM2)"
 	@echo "  $(YELLOW)make all$(NC)         - Executa todo o pipeline"
 	@echo "  $(YELLOW)make clean$(NC)       - Remove arquivos temporários e logs"
 	@echo "  $(YELLOW)make status$(NC)      - Mostra status dos arquivos e banco"
 	@echo "  $(YELLOW)make check-deps$(NC)  - Verifica dependências"
+	@echo ""
+	@echo "$(GREEN)Controle PM2 (Inserção):$(NC)"
+	@echo "  $(YELLOW)make insert-stop$(NC)    - Para o processo de inserção"
+	@echo "  $(YELLOW)make insert-restart$(NC) - Reinicia o processo de inserção"
+	@echo "  $(YELLOW)make insert-logs$(NC)    - Mostra logs em tempo real"
+	@echo "  $(YELLOW)make insert-status$(NC)  - Mostra status do processo"
+	@echo "  $(YELLOW)make insert-monitor$(NC) - Dashboard de monitoramento"
+	@echo "  $(YELLOW)make insert-clean$(NC)   - Remove processo PM2"
 	@echo ""
 	@echo "$(GREEN)Pipeline completo:$(NC)"
 	@echo "  download → unzip → tables → insert"
@@ -109,17 +117,47 @@ tables: check-deps $(LOG_DIR)
 		exit 1; \
 	fi
 
-# Inserção dos dados
+# Inserção dos dados com PM2
 insert: check-deps $(LOG_DIR)
-	@echo "$(BLUE)📊 Iniciando inserção dos dados...$(NC)"
+	@echo "$(BLUE)📊 Iniciando inserção dos dados com PM2...$(NC)"
 	@echo "Log: $(INSERT_LOG)"
-	@$(PYTHON) $(INSERT_SCRIPT) 2>&1 | tee $(INSERT_LOG)
-	@if [ $$? -eq 0 ]; then \
-		echo "$(GREEN)✓ Dados inseridos com sucesso!$(NC)"; \
-	else \
-		echo "$(RED)✗ Erro na inserção dos dados. Verifique o log: $(INSERT_LOG)$(NC)"; \
-		exit 1; \
-	fi
+	@pm2 start $(INSERT_SCRIPT) --name "cnpj-insert" --interpreter $(PYTHON) --log $(INSERT_LOG) --time
+	@echo "$(GREEN)✓ Processo iniciado com PM2!$(NC)"
+	@echo "$(BLUE)Comandos úteis:$(NC)"
+	@echo "  $(YELLOW)make insert-logs$(NC)     - Ver logs em tempo real"
+	@echo "  $(YELLOW)make insert-status$(NC)   - Ver status do processo"
+	@echo "  $(YELLOW)make insert-stop$(NC)     - Parar o processo"
+	@echo "  $(YELLOW)make insert-restart$(NC)  - Reiniciar o processo"
+
+# Controle do processo PM2
+insert-stop:
+	@echo "$(YELLOW)🛑 Parando processo de inserção...$(NC)"
+	@pm2 stop cnpj-insert 2>/dev/null || echo "$(RED)Processo não encontrado$(NC)"
+	@echo "$(GREEN)✓ Processo parado$(NC)"
+
+insert-restart:
+	@echo "$(YELLOW)🔄 Reiniciando processo de inserção...$(NC)"
+	@pm2 restart cnpj-insert 2>/dev/null || echo "$(RED)Processo não encontrado$(NC)"
+	@echo "$(GREEN)✓ Processo reiniciado$(NC)"
+
+insert-logs:
+	@echo "$(BLUE)📋 Mostrando logs do processo de inserção...$(NC)"
+	@pm2 logs cnpj-insert --lines 50
+
+insert-status:
+	@echo "$(BLUE)📊 Status do processo de inserção...$(NC)"
+	@pm2 status cnpj-insert
+
+insert-monitor:
+	@echo "$(BLUE)📊 Monitorando processo de inserção...$(NC)"
+	@echo "Pressione Ctrl+C para sair"
+	@pm2 monit
+
+# Limpeza PM2
+insert-clean:
+	@echo "$(YELLOW)🧹 Limpando processo PM2...$(NC)"
+	@pm2 delete cnpj-insert 2>/dev/null || echo "$(RED)Processo não encontrado$(NC)"
+	@echo "$(GREEN)✓ Processo removido$(NC)"
 
 # Pipeline completo
 all: download unzip tables insert

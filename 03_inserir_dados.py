@@ -43,56 +43,49 @@ def configurar_logging():
     return logging.getLogger(__name__)
 
 def obter_configuracao_banco():
-    """Obtém a configuração do banco de dados PostgreSQL com valores padrão"""
+    """Obtém a configuração do banco de dados PostgreSQL do arquivo cnpj_config.json"""
     print("\n" + "="*60)
     print("CONFIGURAÇÃO DO BANCO DE DADOS POSTGRESQL")
     print("="*60)
     
     # Verificar se existe arquivo de configuração do script anterior
     config_file = "cnpj_config.json"
-    if os.path.exists(config_file):
-        try:
-            import json
-            with open(config_file, 'r', encoding='utf-8') as f:
-                config_anterior = json.load(f)
-            
-            print(f"Arquivo de configuração encontrado do script anterior:")
-            print(f"  Tipo de banco: {config_anterior.get('tipo_banco', 'N/A')}")
-            print(f"  Banco de dados: {config_anterior.get('dbname', 'N/A')}")
-            print(f"  Usuário: {config_anterior.get('username', 'N/A')}")
-            print(f"  Host: {config_anterior.get('host', 'N/A')}")
-            
-            # Usar automaticamente a configuração encontrada
-            print("\n✅ Usando configuração do arquivo automaticamente")
-            return config_anterior
-            
-        except Exception as e:
-            logger.warning(f"Erro ao ler arquivo de configuração: {str(e)}")
-            print("Arquivo de configuração corrompido, será solicitada nova configuração.")
+    if not os.path.exists(config_file):
+        print("❌ Arquivo de configuração 'cnpj_config.json' não encontrado!")
+        print("Execute primeiro o script 02_criar_tabelas.py para criar a configuração.")
+        sys.exit(1)
     
-    # Se não houver arquivo, usar valores padrão
-    print("\nUsando configurações padrão PostgreSQL:")
-    
-    # Configurações padrão
-    tipo_banco = 'postgres'
-    dbname_padrao = 'cnpjbr'
-    username_padrao = 'postgres'
-    password_padrao = 'postgres123'
-    host_padrao = '127.0.0.1'
-    
-    print(f"  Tipo de banco: {tipo_banco}")
-    print(f"  Banco de dados: {dbname_padrao}")
-    print(f"  Usuário: {username_padrao}")
-    print(f"  Host: {host_padrao}")
-    
-    # Usar valores padrão automaticamente
-    return {
-        'tipo_banco': tipo_banco,
-        'dbname': dbname_padrao,
-        'username': username_padrao,
-        'password': password_padrao,
-        'host': host_padrao
-    }
+    try:
+        import json
+        with open(config_file, 'r', encoding='utf-8') as f:
+            config_anterior = json.load(f)
+        
+        # Validar campos obrigatórios
+        campos_obrigatorios = ['tipo_banco', 'dbname', 'username', 'password', 'host']
+        campos_faltando = [campo for campo in campos_obrigatorios if campo not in config_anterior or not config_anterior[campo]]
+        
+        if campos_faltando:
+            print(f"❌ Campos obrigatórios faltando no cnpj_config.json: {campos_faltando}")
+            print("Execute novamente o script 02_criar_tabelas.py para corrigir a configuração.")
+            sys.exit(1)
+        
+        print(f"✅ Arquivo de configuração encontrado:")
+        print(f"  Tipo de banco: {config_anterior.get('tipo_banco', 'N/A')}")
+        print(f"  Banco de dados: {config_anterior.get('dbname', 'N/A')}")
+        print(f"  Usuário: {config_anterior.get('username', 'N/A')}")
+        print(f"  Host: {config_anterior.get('host', 'N/A')}")
+        
+        print("\n✅ Usando configuração do arquivo automaticamente")
+        return config_anterior
+        
+    except json.JSONDecodeError as e:
+        print(f"❌ Erro ao decodificar JSON do arquivo cnpj_config.json: {str(e)}")
+        print("Verifique se o arquivo está com formato JSON válido!")
+        sys.exit(1)
+    except Exception as e:
+        print(f"❌ Erro inesperado ao ler configuração: {str(e)}")
+        print("Execute novamente o script 02_criar_tabelas.py para corrigir a configuração.")
+        sys.exit(1)
 
 def verificar_pasta_dados():
     """Verifica se a pasta de dados descompactados existe"""
